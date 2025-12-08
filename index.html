@@ -35,11 +35,7 @@
       filter: drop-shadow(0px 20px 80px #fff6) drop-shadow(0px 2px 14px #60bfff);
       transform-origin: center center;
     }
-    @keyframes santamove {
-      0%   { transform: translate(-50%,-50%) rotate(-3deg) scale(1.04); }
-      50%  { transform: translate(-50%,-50%) rotate(5deg) scale(1.1);}
-      100% { transform: translate(-50%,-50%) rotate(-4deg) scale(0.95); }
-    }
+    /* santamove keyframesはJSで動的生成 */
     #snow-front { z-index: 9; pointer-events: none;}
     #xmas-message {
       position: absolute;
@@ -206,17 +202,14 @@
     
     function showNextMessage() {
       if (currentMessageIndex >= messages.length) {
-        // 最後のメッセージまで表示したら自動切り替えを停止
         if (autoMessageInterval) {
           clearInterval(autoMessageInterval);
           autoMessageInterval = null;
         }
         return;
       }
-      
       santaMessage.classList.remove('show');
       santaMessage.classList.add('hide');
-      
       setTimeout(() => {
         santaMessage.classList.remove('hide');
         santaMessage.textContent = messages[currentMessageIndex];
@@ -232,25 +225,22 @@
         btn.style.display = "none";
         musicBtnClicked = true;
         showNextMessage();
-        
-        // 7秒ごとに自動でメッセージを切り替え
         autoMessageInterval = setInterval(showNextMessage, 7000);
       }
     });
     
     santaMessage.addEventListener('click', function() {
       if (musicBtnClicked && currentMessageIndex < messages.length) {
-        // タップされたら自動切り替えをリセット
         if (autoMessageInterval) {
           clearInterval(autoMessageInterval);
         }
         showNextMessage();
-        // まだメッセージが残っていれば再度7秒ごとの自動切り替えを開始
         if (currentMessageIndex < messages.length) {
           autoMessageInterval = setInterval(showNextMessage, 7000);
         }
       }
     });
+
     // ==================== 雪 ===============================
     class Snow {
       constructor(width, height) {
@@ -294,7 +284,6 @@
     const fireworkCanvas = document.getElementById('firework-canvas');
     const fireworkCtx = fireworkCanvas.getContext('2d');
     function resizeAll() {
-      // 画面サイズに全canvasを揃える
       const w = window.innerWidth;
       const h = window.innerHeight;
       canvas.width = w; canvas.height = h;
@@ -351,7 +340,6 @@
         stars.push(star);
       }
     }
-    // ============== 雪のインスタンス大量生成 =====================
     let snowBackArr = [];
     let snowFrontArr = [];
     function initSnow(arr, num, width, height) {
@@ -360,7 +348,6 @@
         arr.push(new Snow(width, height));
       }
     }
-    // =========== 花火パーティクル ============
     let fireworkParticles = [];
     function spawnFirework(x, y) {
       const colors = ['#FFD700', '#FF4F92', '#60bfff', '#B5FFFD', '#FFFFFF', '#A855F7', '#D1FF48', '#FFA600', '#00F47F'];
@@ -382,7 +369,6 @@
       }
     }
     function renderFirework() {
-      // サイズはonResizeでのみ設定、省略
       fireworkCtx.clearRect(0, 0, fireworkCanvas.width, fireworkCanvas.height);
       for(let i=fireworkParticles.length-1; i>=0; --i){
         const p = fireworkParticles[i];
@@ -407,15 +393,12 @@
     }
     renderFirework();
 
-    // ================= アニメーション =================
     function animate() {
-      // 背面雪
       snowBackCtx.clearRect(0, 0, snowBack.width, snowBack.height);
       snowBackArr.forEach(s => {
         s.update(snowBack.width, snowBack.height);
         s.draw(snowBackCtx);
       });
-      // 星
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = 'rgba(28,57,98,0.97)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -423,7 +406,6 @@
         star.update();
         star.draw();
       });
-      // 前面雪
       snowFrontCtx.clearRect(0, 0, snowFront.width, snowFront.height);
       snowFrontArr.forEach(s => {
         s.update(snowFront.width, snowFront.height);
@@ -431,17 +413,17 @@
       });
       requestAnimationFrame(animate);
     }
-    // ========== 最初の初期化とリサイズ ===========
     function onResize() {
       resizeAll();
       initStars();
       initSnow(snowBackArr, 250, snowBack.width, snowBack.height);
       initSnow(snowFrontArr, 140, snowFront.width, snowFront.height);
+      autoSantaAdjust();
     }
     window.addEventListener('resize', onResize);
     onResize();
     animate();
-    // ==================== クリック snow/firework/star ====================
+
     function showSnowBurst(x, y) {
       const el = document.createElement("div");
       el.className = "burst-snow";
@@ -451,7 +433,6 @@
       el.style.height = "24px";
       document.body.appendChild(el);
       setTimeout(() => { el.remove(); }, 850);
-      // 一時的に特別な星
       stars.push({
         x: x,
         y: y,
@@ -469,7 +450,6 @@
         draw:Star.prototype.draw
       });
     }
-    // ボタン以外で花火と雪
     document.body.addEventListener('click', function(e){
       const btnRect = btn.getBoundingClientRect();
       const bx = btnRect.left, by = btnRect.top, bw = btnRect.width, bh = btnRect.height;
@@ -484,6 +464,70 @@
       showSnowBurst(rect.left+rect.width/2, rect.top+rect.height);
       spawnFirework(rect.left+rect.width/2, rect.top+rect.height);
     });
+
+    // === サンタ画像のズレ自動補正・完全版 ===
+    function autoSantaAdjust() {
+      const img = document.getElementById('center-img');
+      // 画像ロード待ち
+      if (!img.complete || img.naturalWidth === 0) {
+        img.onload = autoSantaAdjust;
+        return;
+      }
+      // canvas解析
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx2 = canvas.getContext('2d');
+      ctx2.drawImage(img, 0, 0);
+      const imageData = ctx2.getImageData(0, 0, canvas.width, canvas.height).data;
+      let left = canvas.width, right = 0;
+      for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++) {
+          const alpha = imageData[(y * canvas.width + x) * 4 + 3];
+          if (alpha > 10) { //非透過領域検出（10は閾値、必要に応じ調整可）
+            if (x < left) left = x;
+            if (x > right) right = x;
+          }
+        }
+      }
+      if (left > right) { // 画像が透明ならズレなし
+        left = 0; right = canvas.width;
+      }
+      const contentCenterX = (left + right) / 2;
+      const imgCenterX = canvas.width / 2;
+      const centerOffsetPx = contentCenterX - imgCenterX;
+
+      // img実寸→見かけサイズへ（max-width, max-height指定考慮）
+      const screenW = window.innerWidth;
+      const screenH = window.innerHeight;
+      const imgW = img.naturalWidth;
+      const imgH = img.naturalHeight;
+      let scale = Math.min(0.60 * screenW / imgW, 0.60 * screenH / imgH, 1);
+      let offsetVW = centerOffsetPx * scale / screenW * 100;
+      const baseTranslate = -50 - offsetVW;
+
+      // santamove keyframes更新
+      const styleId = 'center-img-keyframes-fix';
+      let style = document.getElementById(styleId);
+      if (!style) {
+        style = document.createElement('style');
+        style.id = styleId;
+        document.head.appendChild(style);
+      }
+      style.textContent = `
+@keyframes santamove {
+  0%   { transform: translate(${baseTranslate}%, -50%) rotate(-3deg) scale(1.04);}
+  50%  { transform: translate(${baseTranslate}%, -50%) rotate(5deg) scale(1.1);}
+  100% { transform: translate(${baseTranslate}%, -50%) rotate(-4deg) scale(0.95);}
+}
+      `;
+      // animation再適用
+      img.style.animation = 'none';
+      setTimeout(()=>{img.style.animation = ''},10);
+    }
+    window.addEventListener('resize', autoSantaAdjust);
+    document.getElementById('center-img').addEventListener('load', autoSantaAdjust);
+    autoSantaAdjust();
     // ================== END ==================
   </script>
 </body>
